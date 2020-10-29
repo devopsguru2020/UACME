@@ -21,13 +21,19 @@
 #define TEXT_SECTION ".text"
 #define TEXT_SECTION_LEGNTH sizeof(TEXT_SECTION)
 
+typedef enum {
+    UASET_CLEAR = 0,
+    UASET_APPLICATION,
+    UASET_PROGID,
+} UASET;
+
 typedef HRESULT(WINAPI* pfnUserAssocSet)(
-    ULONG set,
+    UASET set,
     LPCWSTR pszExt, 
     LPCWSTR pszSet);
 
 typedef HRESULT(WINAPI* pfnUserAssocSet2)(
-    ULONG set,
+    UASET set,
     LPCWSTR pszExt,
     LPCWSTR pszSet,
     ULONG dwFlags);
@@ -91,7 +97,7 @@ static BYTE UserAssocSet_18362_18363[] = {
 // mov r8, rsi
 // mov rdx, r15
 // call UserAssocSet
-static BYTE UserAssocSet_19041_v2[] = {
+static BYTE UserAssocSet_19041[] = {
     0x44, 0x8B, 0xC9, 0x4C, 0x8B, 0xC6, 0x49, 0x8B, 0xD7
 };
 
@@ -101,13 +107,6 @@ static BYTE UserAssocSet_19041_v2[] = {
 // call UserAssocSet
 static BYTE UserAssocSet_19042[] = {
     0x4C, 0x8B, 0xC7, 0x48, 0x8B, 0xD6, 0x41, 0x8B, 0xC9
-};
-
-// call UserAssocSet
-// mov esi, 80000000h
-// mov edi, 80070005h
-static BYTE UserAssocSet_19041_19042_v1[] = {
-    0xBE, 0x00, 0x00, 0x00, 0x80, 0xBF, 0x05, 0x00, 0x07, 0x80
 };
 
 //

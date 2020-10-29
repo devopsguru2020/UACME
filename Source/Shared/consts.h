@@ -130,7 +130,6 @@
 #define OLE32_DLL                   L"ole32.dll"
 #define OSKSUPPORT_DLL              L"OskSupport.dll"
 #define SHELL32_DLL                 L"shell32.dll"
-#define SYSTEMSETTINGS_HANDLERS_DLL L"SystemSettings.Handlers.dll"
 #define WINMM_DLL                   L"winmm.dll"
 #define WOW64LOG_DLL                L"wow64log.dll"
 

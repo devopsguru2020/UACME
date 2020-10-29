@@ -1899,15 +1899,15 @@ NTSTATUS ucmxWscRegisterAssoc(
     if (!NT_SUCCESS(ntStatus))
         return ntStatus;
 
+    ntStatus = STATUS_UNSUCCESSFUL;
+
     //
     // Set mode: register protocol within the shell.
     //
-    if (g_ctx->dwBuildNumber >= 19041) {
-        hr = UserAssocFunc->UserAssocSet2(2, T_PROTO_HTTP, ProtoGuid, 1);
-    }
-    else {
-        hr = UserAssocFunc->UserAssocSet(2, T_PROTO_HTTP, ProtoGuid);
-    }
+
+    hr = UserAssocFunc->UserAssocSet(UASET_PROGID, 
+        T_PROTO_HTTP, 
+        ProtoGuid);
 
     if (SUCCEEDED(hr))
         ntStatus = STATUS_SUCCESS;
@@ -1961,8 +1961,8 @@ NTSTATUS ucmWscActionFindInternalRoutine(
         patternSize = sizeof(UserAssocSet_18362_18363);
         break;
     case 19041:
-        patternPtr = UserAssocSet_19041_v2;
-        patternSize = sizeof(UserAssocSet_19041_v2);
+        patternPtr = UserAssocSet_19041;
+        patternSize = sizeof(UserAssocSet_19041);
         break;
     case 19042:
         patternPtr = UserAssocSet_19042;
@@ -1974,14 +1974,6 @@ NTSTATUS ucmWscActionFindInternalRoutine(
 
     _strcpy(szBuffer, g_ctx->szSystemDirectory);
     _strcat(szBuffer, SHELL32_DLL);
-    /*
-    if (g_ctx->dwBuildNumber >= 19041) {
-        _strcat(szBuffer, SYSTEMSETTINGS_HANDLERS_DLL);
-    }
-    else {
-        _strcat(szBuffer, SHELL32_DLL);
-    }
-    */
 
     hModule = (HANDLE)LoadLibraryEx(szBuffer, NULL, 0);
     if (hModule == NULL)
