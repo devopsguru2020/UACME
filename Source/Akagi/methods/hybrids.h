@@ -41,8 +41,9 @@ typedef HRESULT(WINAPI* pfnUserAssocSet2)(
 typedef struct _USER_ASSOC_PTR {
     union {
         pfnUserAssocSet UserAssocSet;
-        pfnUserAssocSet2 UserAssocSet2; //Win10 2004
+        pfnUserAssocSet2 UserAssocSet2; //Win10 1904 1909
     } DUMMYUNIONNAME;
+    BOOL Valid;
 } USER_ASSOC_PTR, * PUSER_ASSOC_PTR;
 
 //
@@ -57,20 +58,20 @@ static BYTE UserAssocSet_7601[] = {
     0x4C, 0x8B, 0x43, 0x40, 0x48, 0x8B, 0x53, 0x38, 0xB9, 0x01, 0x00, 0x00, 0x00
 };
 
-// mov r8, r15
-// mov rdx, r14
+// mov r8, rsi
+// mov rdx, rbx
 // mov ecx, 2
 // call UserAssocSet
 static BYTE UserAssocSet_9600[] = {
-    0x4D, 0x8B, 0xC7, 0x49, 0x8B, 0xD6, 0xB9, 0x02, 0x00, 0x00, 0x00
+    0x4C, 0x8B, 0xC6, 0x48, 0x8B, 0xD3, 0xB9, 0x02, 0x00, 0x00, 0x00
 };
 
-// mov rdx, [rsi]
-// mov r8, rbx
+// imul rax, 4Eh
 // mov ecx, 2
+// add r8, rax
 // call UserAssocSet
 static BYTE UserAssocSet_14393[] = {
-    0x48, 0x8B, 0x16, 0x4C, 0x8B, 0xC3, 0xB9, 0x02, 0x00, 0x00, 0x00
+    0x48, 0x6B, 0xC0, 0x4E, 0xB9, 0x02, 0x00, 0x00, 0x00, 0x4C, 0x03, 0xC0
 };
 
 // mov r8, rsi
@@ -85,13 +86,17 @@ static BYTE UserAssocSet_17763[] = {
 // mov r8, rsi
 // mov rdx, r15
 // call UserAssocSet
-static BYTE UserAssocSet_18362_18363[] = {
+static BYTE UserAssocSet_18362[] = {
     0x44, 0x8B, 0xC9, 0x4C, 0x8B, 0xC6, 0x49, 0x8B, 0xD7
 };
 
-//
-// In Windows 10 2004 and above it is different.
-//
+// mov r8, rsi
+// mov r9d, ecx
+// mov rdx, r15
+// call UserAssocSet
+static BYTE UserAssocSet_18363[] = {
+    0x4C, 0x8B, 0xC6, 0x44, 0x8B, 0xC9, 0x49, 0x8B, 0xD7
+};
 
 // mov r9d, ecx
 // mov r8, rsi
@@ -107,6 +112,14 @@ static BYTE UserAssocSet_19041[] = {
 // call UserAssocSet
 static BYTE UserAssocSet_19042[] = {
     0x4C, 0x8B, 0xC7, 0x48, 0x8B, 0xD6, 0x41, 0x8B, 0xC9
+};
+
+// mov r8, rsi
+// mov rdx, r14
+// mov eax, ecx
+// call UserAssocSet
+static BYTE UserAssocSet_vNext[] = {
+    0x4C, 0x8B, 0xC6, 0x49, 0x8B, 0xD6, 0x8B, 0xC8
 };
 
 //

